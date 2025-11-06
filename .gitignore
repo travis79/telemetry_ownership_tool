@@ -1,0 +1,9 @@
+inputs
+outputs
+.venv
+__pycache__
+*.pyc
+.env
+.vscode
+.idea
+.DS_Store

@@ -1,0 +1,58 @@
+---
+
+# config.yaml (default example)
+
+# Default configuration for Telemetry Ownership Tool
+# Tweak these to fit your environment and organizational preferences.
+
+# Exclude core Glean pings/metrics on mobile apps (names/prefixes, case-insensitive).
+exclusions:
+  core_pings:
+    - baseline
+    - metrics
+    - events
+    - health
+    - deletion-request
+    - fog-validation
+    - glean_validation
+    - glean_internal
+  core_metric_prefixes:
+    - glean.
+    - fog.
+    - glean_internal.
+    - nimbus.validation.
+
+# Ownership resolution rules
+ownership_rules:
+  # Heuristics to recognize team list emails in notification_emails
+  team_email_heuristics: [team, -, telemetry, fx, nimbus]
+
+# iOS fallback owners (used when tags & emails don't identify a clear owner)
+fallbacks:
+  ios_general: fx-ios-data-stewards@mozilla.com
+  ios_sync: sync-team@mozilla.com
+  ios_nimbus: project-nimbus@mozilla.com
+
+# Desktop mirroring (GIFFT) — used only for Firefox Desktop
+mirrors:
+  # Heuristic phrases to detect mirrors in Desktop index.json
+  heuristic_phrases:
+    - legacy telemetry
+    - generated to correspond
+    - corresponds to the legacy telemetry
+    - mirrors to the legacy telemetry
+    - gifft
+    - telemetry_mirror
+
+# CODEOWNERS enrichment (iOS only)
+# If paths are not provided or files are missing, enrichment is skipped.
+codeowners:
+  # Point to CODEOWNERS files (optional)
+  # firefox_ios: "./inputs/firefox_ios_CODEOWNERS"
+  # focus_ios:   "./inputs/focus_ios_CODEOWNERS"
+
+  # Optionally map CODEOWNERS tokens (e.g. @org/team) to canonical owner emails or labels
+  owner_token_map:
+    "@mozilla-mobile/ios-data-stewards": fx-ios-data-stewards@mozilla.com
+    "@mozilla/application-services": sync-team@mozilla.com
+    "@mozilla/experimenter": project-nimbus@mozilla.com
