@@ -145,3 +145,16 @@ All rules & knobs live in config.yaml. A ready-to-use example is in this repo. Y
 
 - Fetch failures
     The tool fetches from the Glean Dictionary by default. If your environment blocks outbound requests, provide local files via --inputs.
+
+## Development
+
+Install tooling (includes lint/format helpers) and run the test suite:
+
+```bash
+pip install -r requirements-dev.txt
+ruff check telemetry_ownership.py tests
+ruff format --check telemetry_ownership.py tests
+python -m unittest discover -s tests
+```
+
+Shortcuts are available via `make lint`, `make format`, and `make test`. Each target automatically installs the dependencies declared in `requirements-dev.txt` if they are missing.
