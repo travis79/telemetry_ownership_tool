@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 # Telemetry Ownership Tool (v3.3)
 # Default behavior:
 #   - Always include Firefox Desktop (fetch index.json from Glean Dictionary if no local file)
@@ -10,34 +11,89 @@
 #   - CSV + Markdown outputs
 
 import argparse, json, fnmatch, sys
+from copy import deepcopy
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 import pandas as pd
 import yaml
 import requests
 
+DEFAULT_CONFIG = {
+    "exclusions": {
+        "core_pings": [
+            "baseline",
+            "metrics",
+            "events",
+            "health",
+            "deletion-request",
+            "fog-validation",
+            "glean_validation",
+            "glean_internal",
+        ],
+        "core_metric_prefixes": [
+            "glean.",
+            "fog.",
+            "glean_internal.",
+            "nimbus.validation.",
+        ],
+    },
+    "ownership_rules": {
+        "team_email_heuristics": ["team", "-", "telemetry", "fx", "nimbus"]
+    },
+    "fallbacks": {
+        "ios_general": "fx-ios-data-stewards@mozilla.com",
+        "ios_sync": "sync-team@mozilla.com",
+        "ios_nimbus": "project-nimbus@mozilla.com",
+    },
+    "mirrors": {
+        "heuristic_phrases": [
+            "legacy telemetry",
+            "generated to correspond",
+            "telemetry_mirror",
+            "gifft",
+        ]
+    },
+    "codeowners": {},
+}
+
+DEFAULT_FALLBACKS = DEFAULT_CONFIG["fallbacks"].copy()
+
+
+def _deep_update(base: dict, overrides: dict | None) -> dict:
+    if not overrides:
+        return base
+    for key, value in overrides.items():
+        if (
+            isinstance(value, dict)
+            and isinstance(base.get(key), dict)
+        ):
+            _deep_update(base[key], value)
+        elif value is not None:
+            base[key] = value
+    return base
+
 # -------------------- Config helpers --------------------
 
 def load_config(path: Path) -> dict:
+    cfg = deepcopy(DEFAULT_CONFIG)
     if not path or not path.exists():
-        # Safe defaults if no config.yaml provided
-        return {
-            "exclusions": {
-                "core_pings": ["baseline","metrics","events","health","deletion-request","fog-validation","glean_validation","glean_internal"],
-                "core_metric_prefixes": ["glean.","fog.","glean_internal.","nimbus.validation."]
-            },
-            "ownership_rules": {
-                "team_email_heuristics": ["team","-","telemetry","fx","nimbus"]
-            },
-            "fallbacks": {
-                "ios_general": "fx-ios-data-stewards@mozilla.com",
-                "ios_sync": "sync-team@mozilla.com",
-                "ios_nimbus": "project-nimbus@mozilla.com"
-            },
-            "codeowners": {}
-        }
+        return cfg
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        raw = yaml.safe_load(f) or {}
+        if not isinstance(raw, dict):
+            print(f"[warn] Config at {path} is not a mapping; using defaults.", file=sys.stderr)
+            raw = {}
+    cfg = _deep_update(cfg, raw)
+    for section in ("exclusions", "ownership_rules", "fallbacks", "mirrors", "codeowners"):
+        if not isinstance(cfg.get(section), dict):
+            cfg[section] = deepcopy(DEFAULT_CONFIG[section])
+    heuristics = cfg["mirrors"].get("heuristic_phrases")
+    if not heuristics:
+        cfg["mirrors"]["heuristic_phrases"] = deepcopy(
+            DEFAULT_CONFIG["mirrors"]["heuristic_phrases"]
+        )
+    cfg["codeowners"].setdefault("owner_token_map", {})
+    return cfg
 
 # -------------------- Network fetching --------------------
 
@@ -229,11 +285,12 @@ def rows_from_app(app_key: str, index_obj: dict, cfg: dict, exclude_core=True, i
     core_pings = set([n.lower() for n in (cfg.get("exclusions", {}).get("core_pings") or [])])
     prefixes = [p.lower() for p in (cfg.get("exclusions", {}).get("core_metric_prefixes") or [])]
     team_email_heur = (cfg.get("ownership_rules", {}) or {}).get("team_email_heuristics", ["team","-","telemetry","fx","nimbus"])
-    fallbacks = cfg.get("fallbacks", {
-        "ios_general":"fx-ios-data-stewards@mozilla.com",
-        "ios_sync":"sync-team@mozilla.com",
-        "ios_nimbus":"project-nimbus@mozilla.com",
-    })
+    user_fallbacks = cfg.get("fallbacks") or {}
+    fallbacks = {
+        "ios_general": user_fallbacks.get("ios_general", DEFAULT_FALLBACKS["ios_general"]),
+        "ios_sync": user_fallbacks.get("ios_sync", DEFAULT_FALLBACKS["ios_sync"]),
+        "ios_nimbus": user_fallbacks.get("ios_nimbus", DEFAULT_FALLBACKS["ios_nimbus"]),
+    }
 
     # CODEOWNERS (iOS only)
     co_cfg = cfg.get("codeowners", {})
@@ -336,9 +393,6 @@ def main():
     args = ap.parse_args()
 
     cfg = load_config(Path(args.config))
-    cfg.setdefault("mirrors", {})
-    cfg["mirrors"].setdefault("heuristic_phrases",
-        ["legacy telemetry","generated to correspond","telemetry_mirror","gifft"])
 
     inputs_dir = Path(args.inputs) if args.inputs else None
     outdir = Path(args.outdir); outdir.mkdir(parents=True, exist_ok=True)
