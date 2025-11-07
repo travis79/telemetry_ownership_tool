@@ -157,4 +157,4 @@ ruff format --check telemetry_ownership.py tests
 python -m unittest discover -s tests
 ```
 
-Shortcuts are available via `make lint`, `make format`, and `make test`. Each target automatically installs the dependencies declared in `requirements-dev.txt` if they are missing.
+Shortcuts are available via `make lint`, `make format`, `make test`, and `make ci`. Each target automatically installs the dependencies declared in `requirements-dev.txt` if they are missing.
